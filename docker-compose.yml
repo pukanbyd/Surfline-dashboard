@@ -1,0 +1,45 @@
+services:
+  # 1. Database สำหรับทำ Data Warehouse เก็บข้อมูลคลื่น
+  postgres:
+    image: postgres:15
+    container_name: surf_postgres
+    environment:
+      POSTGRES_USER: surf_user
+      POSTGRES_PASSWORD: surf_password
+      POSTGRES_DB: surf_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Apache Airflow สำหรับจัดคิวและรัน Task อัตโนมัติ
+  airflow:
+    image: apache/airflow:2.8.1-python3.10
+    container_name: surf_airflow
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=surf_db
+      - POSTGRES_USER=surf_user
+      - POSTGRES_PASSWORD=surf_password
+      - OUTPUT_DIR=/opt/airflow/data
+      - ALLOW_LOCAL_FALLBACK=true
+    volumes:
+      - airflow_dags:/opt/airflow/dags
+      - airflow_scripts:/opt/airflow/scripts
+      - airflow_pipeline_data:/opt/airflow/data
+      - ./.env:/opt/airflow/.env:ro
+      - airflow_data:/opt/airflow
+    ports:
+      - "8080:8080"
+    command: bash -c "rm -f /opt/airflow/airflow-webserver.pid /opt/airflow/airflow-scheduler.pid && airflow db migrate && (airflow scheduler &) && exec airflow webserver --port 8080 --hostname 0.0.0.0 --workers 1"
+
+volumes:
+  postgres_data:
+  airflow_data:
+  airflow_dags:
+  airflow_scripts:
+  airflow_pipeline_data:
